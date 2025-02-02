@@ -46,7 +46,7 @@ void handle_client(int client_socket)
         int bytes = recv(client_socket, buffer, BUFFER_SIZE, 0);
         username = buffer;
         // cout << bytes << endl;
-        if (bytes< 0)
+        if (bytes<= 0)
         {
             close(client_socket);
             return;
@@ -59,7 +59,11 @@ void handle_client(int client_socket)
     while (true)
     {
         send(client_socket, "Enter password : ", 18, 0);
-        recv(client_socket, buffer, BUFFER_SIZE, 0);
+        int bytes_recieved=recv(client_socket, buffer, BUFFER_SIZE, 0);
+        if(bytes_recieved<=0){
+            close(client_socket);
+            return;
+        }
         password = buffer;
         if (password.empty())
         {
@@ -69,11 +73,7 @@ void handle_client(int client_socket)
             break;
     }
 
-    if (check_valid_user(username, password))
-    {
-        send(client_socket, "Authentication successful.", 28, 0);
-    }
-    else
+    if (!check_valid_user(username, password))
     {
         send(client_socket, "Authentication failed.", 24, 0);
         close(client_socket);
@@ -91,7 +91,7 @@ void handle_client(int client_socket)
     client_names[client_socket] = username;
     client_id[username] = client_socket;
     client_mutex.unlock();
-
+    send(client_socket, "Authentication successful.", 28, 0);
     send_broadcast_message(client_socket, username + " has joined the chat.");
 
     while (true)
@@ -103,6 +103,7 @@ void handle_client(int client_socket)
             client_names.erase(client_socket);
             client_id.erase(username);
             client_mutex.unlock();
+            send_broadcast_message(client_socket, username + " has exited the chat.");
             break;
         }
         string command = buffer;
@@ -116,9 +117,10 @@ void handle_client(int client_socket)
             client_names.erase(client_socket);
             client_id.erase(username);
             client_mutex.unlock();
+            send_broadcast_message(client_socket, username + " has exited the chat.");
             break;
         }
-        if ("/msg" == command.substr(0, 4))
+        if ("/msg" == command.substr(0, 4) && command[4]==' ')
         {
             // parse the command into /msg <username> <message>
             istringstream iss(command);
@@ -148,11 +150,11 @@ void handle_client(int client_socket)
             bool receiver_found = false;
             send(client_id[receiver], message.c_str(), message.size(), 0);
         }
-        else if ("/broadcast" == command.substr(0, 10))
+        else if ("/broadcast" == command.substr(0, 10)  && command[10]==' ')
         {
             send_broadcast_message(client_socket, "[" + username + "]" + " : " + command.substr(11));
         }
-        else if ("/create_group" == command.substr(0, 13))
+        else if ("/create_group" == command.substr(0, 13) && command[13]==' ')
         {
             string group_name = command.substr(14);
             unique_lock<std::mutex> lock(group_mutex);
@@ -165,7 +167,7 @@ void handle_client(int client_socket)
             lock.unlock();
             send_broadcast_message(client_socket, username + " has created group " + group_name);
         }
-        else if ("/join_group" == command.substr(0, 11))
+        else if ("/join_group" == command.substr(0, 11) && command[11]==' ')
         {
             string group_name = command.substr(12);
             unique_lock<std::mutex> lock(group_mutex);
@@ -173,7 +175,7 @@ void handle_client(int client_socket)
             lock.unlock();
             send_broadcast_message(client_socket, username + " has joined group " + group_name);
         }
-        else if ("/leave_group" == command.substr(0, 12))
+        else if ("/leave_group" == command.substr(0, 12)  && command[12]==' ')
         {
             string group_name = command.substr(13);
             unique_lock<std::mutex> lock(group_mutex);
@@ -181,7 +183,7 @@ void handle_client(int client_socket)
             lock.unlock();
             send_broadcast_message(client_socket, username + " has left group " + group_name);
         }
-        else if ("/group_msg" == command.substr(0, 10))
+        else if ("/group_msg" == command.substr(0, 10)  && command[10]==' ')
         {
             istringstream iss(command);
             vector<string> tokens;
