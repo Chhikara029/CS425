@@ -44,4 +44,8 @@ Else the server sends the message "<username> has left the group <groupname>"
 
 /group_msg: If the group exists and the user belongs to the group, then all the other users are sent the corresponding message.
 
-Implementation:
+Design and Implementation:
+There
+For the server side code, there is the main thread which accepts new connections from clients logging in. All the logged in clients are handled by individual threads. This is to ensure that all clients can be served concurrently and independently.
+We use two mutex locks, client_lock and group_lock.
+Whenever 
