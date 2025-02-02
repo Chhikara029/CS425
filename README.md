@@ -44,4 +44,12 @@ Else the server sends the message "<username> has left the group <groupname>"
 
 /group_msg: If the group exists and the user belongs to the group, then all the other users are sent the corresponding message.
 
-Implementation:
+Implementation and design:
+For storing data regarding groups, users and sockets we used unordered_maps.
+users:Stores the mapping of users to passwords.(loaded from text file).
+client_names:mainatains the mapping of sockets to clients.
+client_id:maintains the mapping of clients to sockets.
+group_members:maintians the mapping of group to set of clients in the group
+
+We make use of 2 mutex locks, client_mutex and group_mutex.
+These locks are put at all pieces of code where these map values are being changed or accessed. For example, once authentication is done, the code checks if the client is not logged in already and logs in the user.A lock has to be put on this part to prevent two processess logging in with the same username.
