@@ -75,7 +75,7 @@ void handle_client(int client_socket)
 
     if (!check_valid_user(username, password))
     {
-        send(client_socket, "Authentication failed.", 24, 0);
+        send(client_socket, "Error:Authentication failed.", 30, 0);
         close(client_socket);
         return;
     }
@@ -83,7 +83,8 @@ void handle_client(int client_socket)
     client_mutex.lock();
     if (client_id.find(username) != client_id.end())
     {
-        send(client_socket, "User already logged in.", 24, 0);
+        
+        send(client_socket, "Error:User already logged in.", 30, 0);
         client_mutex.unlock();
         close(client_socket);
         return;
@@ -132,14 +133,14 @@ void handle_client(int client_socket)
             }
             if (tokens.size() < 3)
             {
-                send(client_socket, "Invalid command.\n", 18, 0);
+                send(client_socket, "Error:Invalid command.", 24, 0);
                 continue;
             }
             string receiver = tokens[1];
             string message = "[" + username + "]" + " : ";
             if (client_id.find(receiver) == client_id.end())
             {
-                string msg = receiver + " has not logged in.";
+                string msg = "Error:" + receiver + " has not logged in.";
                 send(client_socket, msg.c_str(), msg.size(), 0);
                 continue;
             }
@@ -160,7 +161,7 @@ void handle_client(int client_socket)
             unique_lock<std::mutex> lock(group_mutex);
             if (group_members.find(group_name) != group_members.end())
             {
-                send(client_socket, "Group already exists.\n", 23, 0);
+                send(client_socket, "Error:Group already exists.", 29, 0);
                 continue;
             }
             group_members[group_name].insert(username);
@@ -169,18 +170,50 @@ void handle_client(int client_socket)
         }
         else if ("/join_group" == command.substr(0, 11) && command[11]==' ')
         {
+            int flag=0;
             string group_name = command.substr(12);
             unique_lock<std::mutex> lock(group_mutex);
-            group_members[group_name].insert(username);
+            if(group_members.find(group_name)==group_members.end())
+            {
+                string message="Error:Group does not exist";
+                send(client_socket, message.c_str(), message.size(), 0);
+            }
+            else if(group_members[group_name].find(username)!=group_members[group_name].end())
+            {
+                send(client_socket, "Error:You are already a member of this group.", 46, 0);
+                continue;
+            }
+            else
+            {
+                group_members[group_name].insert(username);
+                flag=1;
+            }
             lock.unlock();
+            if(flag)
             send_broadcast_message(client_socket, username + " has joined group " + group_name);
         }
         else if ("/leave_group" == command.substr(0, 12)  && command[12]==' ')
         {
+            int flag=0;
             string group_name = command.substr(13);
             unique_lock<std::mutex> lock(group_mutex);
+            if(group_members.find(group_name)==group_members.end())
+            {
+                string message="Error:Group does not exist";
+                send(client_socket, message.c_str(), message.size(), 0);
+            }
+            else if(group_members[group_name].find(username)==group_members[group_name].end())
+            {
+                send(client_socket, "Error:You are not a member of this group.", 42, 0);
+                continue;
+            }
+            else
+            {
             group_members[group_name].erase(username);
+            flag=1;
+            }
             lock.unlock();
+            if(flag)
             send_broadcast_message(client_socket, username + " has left group " + group_name);
         }
         else if ("/group_msg" == command.substr(0, 10)  && command[10]==' ')
@@ -201,12 +234,12 @@ void handle_client(int client_socket)
             }
             if (group_members.find(group_name) == group_members.end())
             {
-                send(client_socket, "Group does not exist.\n", 22, 0);
+                send(client_socket, "Error:Group does not exist.", 28, 0);
                 continue;
             }
             if (group_members[group_name].find(username) == group_members[group_name].end())
             {
-                send(client_socket, "You are not a member of this group.\n", 36, 0);
+                send(client_socket, "Error:You are not a member of this group.", 42, 0);
                 continue;
             }
             for (auto member : group_members[group_name])
@@ -223,7 +256,7 @@ void handle_client(int client_socket)
         }
         else
         {
-            send(client_socket, "Invalid command.\n", 18, 0);
+            send(client_socket, "Error:Invalid command.", 24, 0);
         }
     }
 
