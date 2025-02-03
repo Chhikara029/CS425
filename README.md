@@ -53,3 +53,9 @@ group_members:maintians the mapping of group to set of clients in the group
 
 We make use of 2 mutex locks, client_mutex and group_mutex.
 These locks are put at all pieces of code where these map values are being changed or accessed. For example, once authentication is done, the code checks if the client is not logged in already and logs in the user.A lock has to be put on this part to prevent two processess logging in with the same username.
+
+Functions:
+load_txt_file(filename, users):loads all the username and password data from the txt file into the users map.
+check_valid_user(username, password):given a username and password, returns true if username exists and password matches the username, otherwise returns false.
+send_broadcast_message(client, message): sends the message to all logged in users except the client who is calling the function.
+handle_client(client_socket): first takes the username and password from the client to log in, and then handles all requests by client. For each client, there is a seperate thread running an instance of handle_client.
