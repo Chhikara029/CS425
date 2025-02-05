@@ -78,51 +78,156 @@ There is a main thread which is responsible for accepting connections from clien
 - load_txt_file(filename, users):loads all the username and password data from the txt file into the users map.
 - check_valid_user(username, password):given a username and password, returns true if username exists and password matches the username, otherwise returns false.
 - send_broadcast_message(client, message): sends the message to all logged in users except the client who is calling the function.
-- handle_client(client_socket): first takes the username and password from the client to log in, and then handles all requests by client. For each client, there is a seperate thread running an instance of handle_client.
+- handle_client(client_socket): first takes the username and password from the client to log in, and then handles all requests by client. For each client, there   is a seperate thread running an instance of handle_client.
 
 #### Notes
 - Once a group is created, it remains created as long as the server is running(even if all members have left the group).
 - If a user disconnects, they still remain a part of any groups they were a part of, but they won't have access to the messages sent while they were offline.
 
 #### Server Code Flow
-```mermaid
-graph TD;
-    A[Start] --> B[Load Users from users.txt]
-    B --> C[Create Server Socket]
-    C -->|Error| D[Exit with Error]
-    C --> E[Set Socket Options]
-    E --> F[Bind Socket to Port 12345]
-    F -->|Error| D
-    F --> G[Listen for Incoming Connections]
-    G -->|Error| D
-    G --> H[Accept Client Connections]
-    H --> I[Create New Thread for Client]
-    I --> G
-    I --> J[Handle Client]
-    J --> K[Request Username]
-    K -->|Error| L[Close Connection]
-    K -->|Received| M[Request Password]
-    M -->|Error| L
-    M -->|Received| N[Check Credentials]
-    N -->|Invalid| L
-    N -->|Valid| O[Check if User Already Logged In]
-    O -->|Yes| P[Close Connection]
-    O -->|No| Q[Register User in Active Clients]
-    Q --> R[Notify All Clients]
-    R --> S[Wait for Client Commands]
-    S -->|/exit| T[Remove Client from Active List]
-    T --> U[Notify All Clients]
-    U --> V[Close Connection]
-    V --> ZZZ[End Thread]
-    S -->|/msg <user> <message>| W[Send Private Message]
-    S -->|/broadcast <message>| X[Broadcast Message]
-    S -->|/create_group <group>| Y[Create Group]
-    S -->|/join_group <group>| Z[Join Group]
-    S -->|/leave_group <group>| AA[Leave Group]
-    S -->|/group_msg <group> <message>| AB[Send Group Message]
-    S -->|Invalid Command| AC[Send Error Message]
-    AC --> T
+```
+                                             +-----------------------------------------------------------+
+                                             |                         Start                             |
+                                             +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |                   Create Server Socket                    |
+                                             |                    Set socket options                     |
+                                             |                 Bind server to port 12345                 |
+                                             +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |             Listen for client connections                 | <---
+                                             +-----------------------------------------------------------+    |
+                                                                         |                                    |
+                                                                         v                                    |
+                                             +-----------------------------------------------------------+    |
+                                             |                  Accept client connection                 |    |
+                                             +-----------------------------------------------------------+    |
+                                                                         |                                    |
+                                                                         v                                    |
+                                             +-----------------------------------------------------------+    |
+                                             |          Create a new thread to handle the client         |----|
+                                             +-----------------------------------------------------------+
+                                                                         | corresponding thread
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |                     Receive Username                      |
+                                             +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |               +----------------------------+              |
+                                             |               |          Error?            |              |
+                                             |               +----------------------------+              |
+                                             +---------------------------+-------------------------------+
+                                                                         |
+                                                                         v
+                                              +-----------------------------------------------------------+
+                                              |                          Yes                              |
+                                              |                +--------------------+                     |
+                                              |                |   Authentication   |                     |
+                                              |                |   Error: Username  |                     |
+                                              |                |   Invalid/Empty    |                     |
+                                              |                +--------------------+                     |
+                                              |                          |                                |
+                                              |                          v                                |
+                                              |                   Close Connection                        |
+                                              +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |                    Receive Password                       |
+                                             +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |               +----------------------------+              |
+                                             |               |          Error?            |              |
+                                             |               +----------------------------+              |
+                                             +---------------------------+-------------------------------+
+                                                                         |
+                                                                         v
+                                              +-----------------------------------------------------------+
+                                              |                         Yes                               |
+                                              |                +--------------------+                     |
+                                              |                |   Authentication   |                     |
+                                              |                |   Error: Password  |                     |
+                                              |                |   Invalid/Empty    |                     |
+                                              |                +--------------------+                     |
+                                              |                           |                               |
+                                              |                           v                               |
+                                              |                    Close Connection                       |
+                                              +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |                  Check Credentials                        |
+                                             +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |               +----------------------------+              |
+                                             |               |    Credentials Valid?      |              |
+                                             |               +----------------------------+              |
+                                             +---------------------------+-------------------------------+
+                                                                         |
+                                                                         v
+                                              +-----------------------------------------------------------+
+                                              |                         No                                |
+                                              |                 +--------------------+                    |
+                                              |                 |   Authentication   |                    |
+                                              |                 |   Error: Invalid   |                    |
+                                              |                 |   Credentials      |                    |
+                                              |                 +--------------------+                    |
+                                              |                           |                               |
+                                              |                           v                               |
+                                              |                    Close Connection                       |
+                                              +-----------------------------------------------------------+
+                                                                          |
+                                                                          v
+                                              +------------------------------------------------------------+
+                                              |                     Proceed to Chat                        |
+                                              +------------------------------------------------------------+
+                                                                          |
+                                                                          v
+                                             +-----------------------------------------------------------+
+                                             |                     Process Commands                      |
+                                             +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |               +---------------------------+               |
+                                             |               | /msg <username>           |               |
+                                             |               | /broadcast <message>      |               |
+                                             |               | /create_group <group_name>|               |
+                                             |               | /join_group <group_name>  |               |
+                                             |               | /leave_group <group_name> |               |
+                                             |               | /group_msg <group_name>   |               |
+                                             |               | /exit                     |               |
+                                             |               +---------------------------+               |
+                                             +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |                  Exit Command or error?                   |
+                                             +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |             +--------------------------+                  |
 
+                                             |             | - Remove user from lists |                  |
+                                             |             | - Send exit broadcast    |                  |
+                                             |              +-------------------------+                  |
+                                             +-----------------------------------------------------------+
+                                                                         |
+                                                                         v
+                                             +-----------------------------------------------------------+
+                                             |                      End  Thread                          |
+                                             +-----------------------------------------------------------+
 ```
 
 ## Testing
