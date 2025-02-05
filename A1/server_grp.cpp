@@ -27,6 +27,7 @@ unordered_map<string, unordered_set<string>> group_members; // group_name -> set
 bool check_valid_user(const string &username, const string &password);
 void send_broadcast_message(int client, const string message)
 {
+    unique_lock<std::mutex> client_lock(client_mutex);
     for (auto client_pair : client_names)
     {
         if (client_pair.first != client)
@@ -34,6 +35,7 @@ void send_broadcast_message(int client, const string message)
             send(client_pair.first, message.c_str(), message.size(), 0);
         }
     }
+    client_lock.unlock();
 }
 
 void handle_client(int client_socket)
@@ -80,18 +82,18 @@ void handle_client(int client_socket)
         return;
     }
 
-    client_mutex.lock();
+    unique_lock<std::mutex> client_lock(client_mutex);
     if (client_id.find(username) != client_id.end())
     {
         
         send(client_socket, "Error: User already logged in.", 30, 0);
-        client_mutex.unlock();
+        client_lock.unlock();
         close(client_socket);
         return;
     }
     client_names[client_socket] = username;
     client_id[username] = client_socket;
-    client_mutex.unlock();
+    client_lock.unlock();
     send(client_socket, "Authentication successful.", 28, 0);
     send_broadcast_message(client_socket, username + " has joined the chat.");
 
@@ -100,10 +102,10 @@ void handle_client(int client_socket)
         memset(buffer, 0, BUFFER_SIZE);
         int bytes_recieved=recv(client_socket, buffer, BUFFER_SIZE, 0);
         if(bytes_recieved<=0){
-            client_mutex.lock();
+            unique_lock<std::mutex> client_lock(client_mutex);
             client_names.erase(client_socket);
             client_id.erase(username);
-            client_mutex.unlock();
+            client_lock.unlock();
             send_broadcast_message(client_socket, username + " has exited the chat.");
             break;
         }
@@ -114,10 +116,10 @@ void handle_client(int client_socket)
         }
         if (command == "/exit")
         {
-            client_mutex.lock();
+            unique_lock<std::mutex> client_lock(client_mutex);
             client_names.erase(client_socket);
             client_id.erase(username);
-            client_mutex.unlock();
+            client_lock.unlock();
             send_broadcast_message(client_socket, username + " has exited the chat.");
             break;
         }
@@ -138,10 +140,12 @@ void handle_client(int client_socket)
             }
             string receiver = tokens[1];
             string message = "[" + username + "]" + " : ";
+            unique_lock<std::mutex> client_lock(client_mutex);
             if (client_id.find(receiver) == client_id.end())
             {
                 string msg = "Error:" + receiver + " has not logged in.";
                 send(client_socket, msg.c_str(), msg.size(), 0);
+                client_lock.unlock();
                 continue;
             }
             for (int i = 2; i < tokens.size(); i++)
@@ -150,6 +154,7 @@ void handle_client(int client_socket)
             }
             bool receiver_found = false;
             send(client_id[receiver], message.c_str(), message.size(), 0);
+            client_lock.unlock();
         }
         else if ("/broadcast" == command.substr(0, 10)  && command[10]==' ')
         {
@@ -158,21 +163,23 @@ void handle_client(int client_socket)
         else if ("/create_group" == command.substr(0, 13) && command[13]==' ')
         {
             string group_name = command.substr(14);
-            unique_lock<std::mutex> lock(group_mutex);
+            unique_lock<std::mutex> group_lock(group_mutex);
             if (group_members.find(group_name) != group_members.end())
             {
                 send(client_socket, "Error: Group already exists.", 29, 0);
+                group_lock.unlock();
                 continue;
             }
             group_members[group_name].insert(username);
-            lock.unlock();
+            group_lock.unlock();
             send_broadcast_message(client_socket, username + " has created group " + group_name);
         }
         else if ("/join_group" == command.substr(0, 11) && command[11]==' ')
         {
             int flag=0;
             string group_name = command.substr(12);
-            unique_lock<std::mutex> lock(group_mutex);
+            unique_lock<std::mutex> client_lock(client_mutex);
+            unique_lock<std::mutex> group_lock(group_mutex);
             if(group_members.find(group_name)==group_members.end())
             {
                 string message="Error: Group does not exist";
@@ -181,14 +188,14 @@ void handle_client(int client_socket)
             else if(group_members[group_name].find(username)!=group_members[group_name].end())
             {
                 send(client_socket, "Error: You are already a member of this group.", 46, 0);
-                continue;
             }
             else
             {
                 group_members[group_name].insert(username);
                 flag=1;
             }
-            lock.unlock();
+            client_lock.unlock();
+            group_lock.unlock();
             if(flag)
             send_broadcast_message(client_socket, username + " has joined group " + group_name);
         }
@@ -196,7 +203,8 @@ void handle_client(int client_socket)
         {
             int flag=0;
             string group_name = command.substr(13);
-            unique_lock<std::mutex> lock(group_mutex);
+            unique_lock<std::mutex> client_lock(client_mutex);
+            unique_lock<std::mutex> group_lock(group_mutex);
             if(group_members.find(group_name)==group_members.end())
             {
                 string message="Error: Group does not exist";
@@ -205,14 +213,14 @@ void handle_client(int client_socket)
             else if(group_members[group_name].find(username)==group_members[group_name].end())
             {
                 send(client_socket, "Error: You are not a member of this group.", 42, 0);
-                continue;
             }
             else
             {
             group_members[group_name].erase(username);
             flag=1;
             }
-            lock.unlock();
+            client_lock.unlock();
+            group_lock.unlock();
             if(flag)
             send_broadcast_message(client_socket, username + " has left group " + group_name);
         }
@@ -232,14 +240,20 @@ void handle_client(int client_socket)
             {
                 message += " " + tokens[i];
             }
+            unique_lock<std::mutex> client_lock(client_mutex);
+            unique_lock<std::mutex> group_lock(group_mutex);
             if (group_members.find(group_name) == group_members.end())
             {
                 send(client_socket, "Error: Group does not exist.", 28, 0);
+                client_lock.unlock();
+                group_lock.unlock();
                 continue;
             }
             if (group_members[group_name].find(username) == group_members[group_name].end())
             {
                 send(client_socket, "Error: You are not a member of this group.", 42, 0);
+                client_lock.unlock();
+                group_lock.unlock();
                 continue;
             }
             for (auto member : group_members[group_name])
@@ -253,11 +267,14 @@ void handle_client(int client_socket)
                     send(client_id[member], message.c_str(), message.size(), 0);
                 }
             }
+            client_lock.unlock();
+            group_lock.unlock();
         }
         else
         {
             send(client_socket, "Error: Invalid command.", 24, 0);
         }
+        
     }
 
     close(client_socket);
@@ -295,37 +312,6 @@ void load_txt_file(const string &filename, unordered_map<string, string> &users)
 
 bool check_valid_user(const string &username, const string &password)
 {
-    /*ifstream file("users.txt"); // Open the file
-
-    if (!file)
-    { // Check if file opened successfully
-        cerr << "Error opening users.txt file!" << endl;
-        return false;
-    }
-
-    string line, stored_username, stored_password;
-
-    while (getline(file, line))
-    {                                          // Read each line
-        size_t delimiter_pos = line.find(':'); // Find the position of ':'
-        if (delimiter_pos == string::npos)
-        {
-            continue; // Skip lines without the expected format
-        }
-
-        // Extract username and password
-        stored_username = line.substr(0, delimiter_pos);
-        stored_password = line.substr(delimiter_pos + 1);
-
-        // Compare with provided username and password
-        if (stored_username == username && stored_password == password)
-        {
-            return true; // Authentication successful
-        }
-    }
-
-    return false; // No match found
-    */
     if (users.find(username) != users.end() && users[username] == password)
     {
         return true;
