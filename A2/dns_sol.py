@@ -23,7 +23,7 @@ def send_dns_query(server, domain):
     try:
         query = dns.message.make_query(domain, dns.rdatatype.A)  # Construct the DNS query
         # TODO: Send the query using UDP
-        response = dns.query.udp(query, server) 
+        response = dns.query.udp(query, server, timeout= TIMEOUT) #wait till timeout for response
         return response
         # Note that above TODO can be just a return statement with the UDP query!
     except Exception:
@@ -51,10 +51,10 @@ def extract_next_nameservers(response):
         if rrset.rdtype == dns.rdatatype.NS:
             for rr in rrset:
                 ns_name = rr.to_text()
-                resolver = dns.resolver.Resolver()
+                resolver = dns.resolver.Resolver()  
                 val = resolver.resolve(ns_name, 'A')  # Use 'A' for IPv4 address
                 for ns_ip in val:
-                   ns_ips.append(ns_ip.address)  
+                   ns_ips.append(ns_ip.address)        # Append to the list of IP addresses
      
     # To TODO, you would have to write a similar loop as above
 
@@ -91,7 +91,7 @@ def iterative_dns_lookup(domain):
                 stage = "TLD"
             elif stage=="TLD":
                 stage = "AUTH"
-            else:
+            else:                         #exit after reaching authoritative servers
                 break        
 
         else:
