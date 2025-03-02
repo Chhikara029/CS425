@@ -26,9 +26,9 @@ Additionally, the application also displays the NS hostnames at each level and t
 
 
 # Changes made to code
-1. For the TODO in send DNS query, we just return the response to dns.query.udp(query, server) . 
+1. For the TODO in send DNS query, we wait till timeout and return the response to dns.query.udp(query, server) . 
 2. For the TODO in extract_next_nameserver, we run a for loop on each line of the response and use
  the library resolver function to resolve the host names to address.
-3. In the function for iterative dns lookup, used if-else logic to move to the next stage of resolution after next set of hostnames is recieved.
-4. In the function for recursive dns lookup, added answer = dns.resolver.resolve(domain, "NS") to resolve the host names from
+3. In the TODO for iterative dns lookup, used if-else logic to move to the next stage of resolution after next set of hostnames is recieved.
+4. In the TODO for recursive dns lookup, added answer = dns.resolver.resolve(domain, "NS") to resolve the host names from the response.
  
