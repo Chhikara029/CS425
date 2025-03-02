@@ -14,15 +14,16 @@ atative server. The resolved IP address is propagated back to the host.
 
 2. Iterative Querying
 -The local server itself queries the name servers successively, starting with the root server.
+- Root->TLD->Authoritative
 
 Additionally, the application also displays the NS hostnames at each level and the execution time.
 
 # Instructions
 1. Ensure that python and it's library dnspython are installed in your system.
 2. To run the script, type the following command in the terminal:
-   python3 dns_server.py <mode> <domain>
+   python3 dns_resolver.py <mode> <domain>
    mode can be "recursive" or "iterative". For example, 
-   python3 dns_server.py iterative google.command
+   python3 dns_resolver.py iterative google.command
 
 
 # Changes made to code
